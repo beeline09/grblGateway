@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <math.h>
 
 #include "grbl_chat_c.h"
+#include <Arduino.h>
 
 #define SERIAL_NO_DATA -1
 #define NUMSTATES 13
@@ -76,7 +77,9 @@ grbl_data_t grbl_data = {
     .coolant.flood = false,
     .buffer = 0,
     .buffer_rx = 0,
-};
+    .message = "",
+    .alarm = "",
+    .error = ""};
 
 static bool flush = false;
 static volatile bool await = false;
@@ -399,9 +402,43 @@ void parseData(char *block)
         }
     }
     else if (!strncmp(line, "[MSG:", 5))
+    {
+        strcpy(grbl_data.message, line);
         grbl_data.changed.msg = true;
-    else if (!strncmp(line, "error:", 6) || !strncmp(line, "ALARM:", 6))
+    }
+    else if (!strncmp(line, "error:", 6))
+    {
         grbl_data.changed.msg = true;
+        strcpy(grbl_data.error, line);
+    }
+    else if (!strncmp(line, "ALARM:", 6))
+    {
+        strcpy(grbl_data.alarm, line);
+        grbl_data.changed.msg = true;
+    }
+}
+
+void clearGrblMessage()
+{
+    for (int i = 0; i < 255; i++)
+    {
+        grbl_data.message[i] = 0;
+    }
+}
+
+void clearGrblAlarm()
+{
+    for (int i = 0; i < 255; i++)
+    {
+        grbl_data.alarm[i] = 0;
+    }
+}
+void clearGrblError()
+{
+    for (int i = 0; i < 255; i++)
+    {
+        grbl_data.error[i] = 0;
+    }
 }
 
 // Example Serial polling

@@ -4,13 +4,16 @@
 #include "prefs.h"
 #include "hub.h"
 
+String ipAddress;
+
 void initSoftAp()
 {
     WiFi.disconnect();
     WiFi.mode(WIFI_MODE_AP);
     WiFi.softAP("GrblGateway");
-    Serial.println("Start SoftAP");
-    Serial.println(WiFi.softAPIP());
+    Serial.print("Start SoftAP with address: ");
+    ipAddress = WiFi.softAPIP().toString();
+    Serial.println(ipAddress);
     initHub();
 }
 
@@ -45,7 +48,9 @@ void initWiFi()
             return;
         }
         connectionAttempts = 0;
-        Serial.println(WiFi.localIP());
+        ipAddress = WiFi.localIP().toString();
+        Serial.print("IP: ");
+        Serial.println(ipAddress);
         initHub();
     }
 }

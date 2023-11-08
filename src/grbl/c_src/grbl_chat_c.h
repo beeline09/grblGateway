@@ -118,6 +118,9 @@ typedef struct {
     char block[255];
     int buffer;
     int buffer_rx;
+    char message[255];
+    char alarm[255];
+    char error[255];
 } grbl_data_t;
 
 grbl_data_t *setGrblReceiveCallback (void (*fn)(char *line));
@@ -125,5 +128,9 @@ void setGrblTransmitCallback (void (*fn)(bool ok, grbl_data_t *grbl_data));
 bool grblParseState (char *state, grbl_t *grbl);
 void parseData(char *);
 grbl_data_t * getData();
+
+void clearGrblMessage();
+void clearGrblAlarm();
+void clearGrblError();
 
 #endif
