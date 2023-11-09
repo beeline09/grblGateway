@@ -11,6 +11,14 @@ String wName;
 String wSoftName;
 String btName;
 String wPass;
+int accXYIndex = 5;
+int accZIndex = 4;
+int stepSizeXYIndex = 7;
+int stepSizeZIndex = 5;
+
+uint16_t spindelRpmSliderMin;
+uint16_t spindelRpmSliderMax;
+uint16_t spindelRpmSliderCurrent;
 
 GP_PGM(GP_TRANSP, "#00000000");
 
@@ -22,7 +30,7 @@ void buildMainApp()
     GP.UI_MENU("Cnc3018 Pro", GP_RED); // начать меню
 
     // список имён компонентов на обновление
-    GP.UPDATE("xAxis,yAxis,zAxis,wName,wPass,alert1,wSoftName,btName,spindelRPM,xAxisR,yAxisR,zAxisR,wMessage,wError,wAlarm");
+    GP.UPDATE("xAxis,yAxis,zAxis,wName,wPass,alert1,wSoftName,btName,spindelRPM,spindelRpmSlider,xAxisR,yAxisR,zAxisR,wMessage,wError,wAlarm,wSpMinRpm,wSpMaxRpm");
 
     GP.PAGE_TITLE("CNC Portal");
 
@@ -76,13 +84,14 @@ void buildMainApp()
                 M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true););
                 M_BOX(GP.TITLE("\u3164"); GP.TITLE("X,Y"); GP.TITLE("Z\u3164\u3164\u3164\u3164"););
                 M_BOX(
-                    GP.LABEL("\u3164\u3164Step\u3164\u3164"); GP.SELECT("stepSizeXY", "0.001,0.025,0.05,0.1,0.5,1,5,10,100", 7); GP.SELECT("stepSizeZ", "0.001,0.025,0.05,0.1,0.5,1,5,10", 5););
+                    GP.LABEL("\u3164\u3164Step size"); GP.SELECT("stepSizeXY", "0.001,0.025,0.05,0.1,0.5,1,5,10,100", stepSizeXYIndex); GP.SELECT("stepSizeZ", "0.001,0.025,0.05,0.1,0.5,1,5,10", stepSizeZIndex););
                 M_BOX(
                     GP.LABEL("Acceleration ");
-                    GP.SELECT("accelerationXY", "1,5,10,25,50,100,250,500,1000,2500,5000,10000", 5); GP.SELECT("accelerationZ", "1,5,10,25,50,100,250,500", 4););
+                    GP.SELECT("accelerationXY", "1,5,10,25,50,100,250,500,1000,2500,5000,10000", accXYIndex); GP.SELECT("accelerationZ", "1,5,10,25,50,100,250,500", accZIndex););
+                GP.LABEL("\u3164");
                 M_BOX(
                     GP.LABEL("Spindel RPM ");
-                    GP.SLIDER("spindelRpmSlider", 100.0, 0.0, 10000.0, 10.0););
+                    GP.SLIDER("spindelRpmSlider", spindelRpmSliderCurrent, spindelRpmSliderMin, spindelRpmSliderMax, 10.0););
 
             ););
     }
@@ -106,6 +115,13 @@ void buildMainApp()
                 "Bluetooth",
                 M_BOX(GP.LABEL("Name"); GP.TEXT("btName", "", btName););
                 GP.BUTTON("saveBtParams", "Save");););
+        M_GRID(
+            M_BLOCK_TAB(
+                "CNC params",
+                M_BOX(GP.LABEL("Spindel min RPM"); GP.NUMBER("wSpMinRpm", "", spindleMinRpm););
+                M_BOX(GP.LABEL("Spindel max RPM"); GP.NUMBER("wSpMaxRpm", "", spindleMaxRpm););
+                GP.PLAIN(/*"Если в течение нескольких попыток не получится подключиться к сети с этими параметрами, то будет запущена WiFi SoftAP"*/ "If within several attempts it is not possible to connect to the network with these parameters, WiFi SoftAP will be launched");
+                GP.BUTTON("saveCncParams", "Save");););
     }
     else if (ui.uri("/info"))
     {
@@ -150,6 +166,18 @@ void actionLabels()
         Serial.print("btName: ");
         Serial.println(btName);
     }
+    else if (ui.clickInt("wSpMinRpm", spindleMinRpm))
+    {
+        char bigBuf[100] = "";
+        sprintf_P(bigBuf, "wSpMinRpm: %d", spindleMinRpm);
+        Serial.println(bigBuf);
+    }
+    else if (ui.clickInt("wSpMaxRpm", spindleMaxRpm))
+    {
+        char bigBuf[100] = "";
+        sprintf_P(bigBuf, "wSpMaxRpm: %d", spindleMaxRpm);
+        Serial.println(bigBuf);
+    }
 }
 
 int alert = 0;
@@ -166,7 +194,7 @@ void action()
         ui.updateString("yAxisR", WposYR);
         ui.updateString("zAxis", WposZ);
         ui.updateString("zAxisR", WposZR);
-        ui.updateString("spindelRPM", spindelValue);
+        ui.updateFloat("spindelRPM", spindelValue, 0);
         ui.updateString("wMessage", wMessage);
         ui.updateString("wError", wError);
         ui.updateString("wAlarm", wAlarm);
@@ -188,6 +216,11 @@ void action()
             {
                 alert = 0;
                 ui.answer(String("Device name must be greater or equal 3 symbols! " + btName));
+            }
+            else if (alert == 4)
+            {
+                alert = 0;
+                ui.answer(String("The minimum spindle speed must be greater than or equal to zero. The maximum speed must be greater than the minimum!"));
             }
         }
     }
@@ -273,6 +306,52 @@ void action()
             delay(50);
             // Serial.println("?");
         }
+        else if (ui.click("saveCncParams"))
+        {
+            if (spindleMinRpm < 0 || spindleMaxRpm < spindleMinRpm)
+            {
+                alert = 4;
+            }
+            else
+            {
+                saveSpindleMinRpm(spindleMinRpm);
+                saveSpindleMaxRpm(spindleMaxRpm);
+                delay(1000);
+                GP.RELOAD("saveCncParams");
+            }
+        }
+        else if (ui.click("spindelRpmSlider"))
+        {
+            uint16_t rpm = (uint16_t)ui.getFloat("spindelRpmSlider");
+            saveSpindelCurrentRpm(rpm);
+            spindelRpmSliderCurrent = rpm;
+            char bigBuf[100] = "";
+            sprintf_P(bigBuf, "Selected spider rpm: %d", rpm);
+            Serial.println(bigBuf);
+
+            if (spindelValue > 0.0 && rpm > 0 && ((uint16_t)spindelValue - rpm) != 0)
+            {
+                char bigBuf[25] = "";
+                sprintf_P(bigBuf, "M3 S%d", rpm);
+                Serial.println(bigBuf);
+            }
+        }
+        else if (ui.click("spindelPower"))
+        {
+            char bigBuf[100] = "";
+            sprintf_P(bigBuf, "Selected spindel rpm: %d", spindelRpmSliderCurrent);
+            Serial.println(bigBuf);
+            if (spindelValue == 0.0 && spindelRpmSliderCurrent > 0)
+            {
+                char bigBuf[25] = "";
+                sprintf_P(bigBuf, "M3 S%d", spindelRpmSliderCurrent);
+                Serial.println(bigBuf);
+            }
+            else
+            {
+                Serial.println("M5");
+            }
+        }
     }
 }
 
@@ -282,6 +361,166 @@ void initHub()
     wPass = getWifiPassword();
     wSoftName = getWifiSoftApName();
     btName = getBtName();
+    spindleMinRpm = getSpindelMinRpm();
+    spindleMaxRpm = getSpindelMaxRpm();
+    spindleCurrentRpm = getSpindelCurrentRpm();
+    spindelRpmSliderMin = spindleMinRpm;
+    spindelRpmSliderMax = spindleMaxRpm;
+    spindelRpmSliderCurrent = spindleCurrentRpm;
+
+    stepSizeXYIndex = 7;
+    stepSizeZIndex = 5;
+
+    //"1,5,10,25,50,100,250,500,1000,2500,5000,10000"
+    switch (getAccelerationXY())
+    {
+    case 1:
+        accXYIndex = 0;
+        break;
+    case 5:
+        accXYIndex = 1;
+        break;
+    case 10:
+        accXYIndex = 2;
+        break;
+    case 25:
+        accXYIndex = 3;
+        break;
+    case 50:
+        accXYIndex = 4;
+        break;
+    case 100:
+        accXYIndex = 5;
+        break;
+    case 250:
+        accXYIndex = 6;
+        break;
+    case 500:
+        accXYIndex = 7;
+        break;
+    case 1000:
+        accXYIndex = 8;
+        break;
+    case 2500:
+        accXYIndex = 9;
+        break;
+    case 5000:
+        accXYIndex = 10;
+        break;
+    case 10000:
+        accXYIndex = 11;
+        break;
+
+    default:
+        accXYIndex = 5;
+        break;
+    }
+
+    //"1,5,10,25,50,100,250,500"
+    switch (getAccelerationZ())
+    {
+    case 1:
+        accZIndex = 0;
+        break;
+    case 5:
+        accZIndex = 1;
+        break;
+    case 10:
+        accZIndex = 2;
+        break;
+    case 25:
+        accZIndex = 3;
+        break;
+    case 50:
+        accZIndex = 4;
+        break;
+    case 100:
+        accZIndex = 5;
+        break;
+    case 250:
+        accZIndex = 6;
+        break;
+    case 500:
+        accZIndex = 7;
+        break;
+
+    default:
+        accZIndex = 4;
+        break;
+    }
+
+    //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
+    float szXY = getStepSizeXY();
+    if (szXY == 0.001)
+    {
+        stepSizeXYIndex = 0;
+    }
+    else if (szXY == 0.025)
+    {
+        stepSizeXYIndex = 1;
+    }
+    else if (szXY == 0.05)
+    {
+        stepSizeXYIndex = 2;
+    }
+    else if (szXY == 0.1)
+    {
+        stepSizeXYIndex = 3;
+    }
+    else if (szXY == 0.5)
+    {
+        stepSizeXYIndex = 4;
+    }
+    else if (szXY == 1.0)
+    {
+        stepSizeXYIndex = 5;
+    }
+    else if (szXY == 5.0)
+    {
+        stepSizeXYIndex = 6;
+    }
+    else if (szXY == 10.0)
+    {
+        stepSizeXYIndex = 7;
+    }
+    else if (szXY == 100.0)
+    {
+        stepSizeXYIndex = 8;
+    }
+    //"0.001,0.025,0.05,0.1,0.5,1,5,10"
+    float szZ = getStepSizeZ();
+    if (szZ == 0.001)
+    {
+        stepSizeZIndex = 0;
+    }
+    else if (szZ == 0.025)
+    {
+        stepSizeZIndex = 1;
+    }
+    else if (szZ == 0.05)
+    {
+        stepSizeZIndex = 2;
+    }
+    else if (szZ == 0.1)
+    {
+        stepSizeZIndex = 3;
+    }
+    else if (szZ == 0.5)
+    {
+        stepSizeZIndex = 4;
+    }
+    else if (szZ == 1.0)
+    {
+        stepSizeZIndex = 5;
+    }
+    else if (szZ == 5.0)
+    {
+        stepSizeZIndex = 6;
+    }
+    else if (szZ == 10.0)
+    {
+        stepSizeZIndex = 7;
+    }
 
     // подключаем конструктор и запускаем
     ui.attachBuild(build);

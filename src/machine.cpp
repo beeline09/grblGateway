@@ -8,7 +8,10 @@ String WposZ; // last known Z heighton workpiece, space for 8 characters is enou
 String WposXR; // last known X pos on workpiece, space for 9 characters ( -999.999\0 )
 String WposYR; // last known Y pos on workpiece
 String WposZR; // last known Z heighton workpiece, space for 8 characters is enough( -99.999\0 )
-String spindelValue;
+float spindelValue;
+uint16_t spindleMinRpm;
+uint16_t spindleMaxRpm;
+uint16_t spindleCurrentRpm;
 String wMessage;
 String wAlarm;
 String wError;

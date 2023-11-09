@@ -10,6 +10,7 @@ void setup()
   Serial.begin(115200);
   initBt();
   initWiFi();
+  Serial.println("$$");
 }
 
 void processMachineError(int errNum)

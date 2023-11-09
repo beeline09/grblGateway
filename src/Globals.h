@@ -12,7 +12,10 @@ extern String WposZ; // last known Z heighton workpiece, space for 8 characters 
 extern String WposXR; // last known X pos on workpiece, space for 9 characters ( -999.999\0 )
 extern String WposYR; // last known Y pos on workpiece
 extern String WposZR; // last known Z heighton workpiece, space for 8 characters is enough( -99.999\0 )
-extern String spindelValue;
+extern float spindelValue;
+extern uint16_t spindleMinRpm;
+extern uint16_t spindleMaxRpm;
+extern uint16_t spindleCurrentRpm;
 extern String wMessage;
 extern String wAlarm;
 extern String wError;
