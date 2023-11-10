@@ -1,4 +1,6 @@
 # GRBL Online controller with BT gateway
+*Read this in other languages: [Russian](README_ru.md)*
+
 Думаю многим знаком ужасный GRBL Controller, который идет в комплекте вместе с CNC 3018 Pro, популярный на многих китайских площадках.
 ![71bmuXZ9FVL](https://github.com/beeline09/grblGateway/assets/2519627/da9a46f9-5c30-4f36-9362-bae5de05f194)
 Меня, после большого опыта с 3д принтерами, это просто ввело в ступор! Это побудило меня решить две проблемы:
