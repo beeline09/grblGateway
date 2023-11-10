@@ -8,7 +8,7 @@ After a lot of experience with 3D printers, this simply stunned me! This prompte
 2. Get rid of wires and be able to connect to the machine via Bluetooth connection.
 
 The **ESP32 doit devkit v1** module is perfect for these purposes.
-После нескольких вечеров кропотливой работы, я довел устройство до более или менее рабочего состояния и готов представить его общественности!
+After several evenings of painstaking work, I brought the device to more or less working condition and am ready to present it to the public!
 
 So here is the list of functions:
 1. Control of axes and spindle.
@@ -30,5 +30,6 @@ Demonstration of my modified CNC 3018 Pro with its original red control board:
 
 In the future, you can update the firmware by clicking on the **OTA Update** button in the side menu.
 
+Many thanks to [Alex Guyver](https://github.com/GyverLibs) for his excellent [GyverPortal](https://github.com/GyverLibs/GyverPortal) library
 
 Work in progress!!!
