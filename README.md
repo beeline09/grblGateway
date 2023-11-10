@@ -1,5 +1,5 @@
 # GRBL Online controller with BT gateway
-*Read this in other languages: [Russian](README_ru.md)*
+*For Russian click here: [Russian](README_ru.md)*
 
 I think many people are familiar with the terrible GRBL Controller, which comes bundled with the CNC 3018 Pro, popular on many Chinese sites.
 ![71bmuXZ9FVL](https://github.com/beeline09/grblGateway/assets/2519627/da9a46f9-5c30-4f36-9362-bae5de05f194)
