@@ -4,6 +4,7 @@
 #include "hub.h"
 #include "bt.h"
 #include "grbl/grbl_chat.h"
+#include "machine.h"
 
 void setup()
 {
@@ -174,7 +175,6 @@ void loop()
 {
   static int_fast16_t c;
   static uint_fast16_t char_counter = 0;
-  static unsigned long lastSendStatus = 0;
   while (SerialBT.available())
   {
     Serial.write(SerialBT.read());
@@ -209,23 +209,23 @@ void loop()
   {
     String sData = String(data->error);
     int errNum = sData.substring(6).toInt();
-    SerialBT.print("Error: ");
-    SerialBT.print(sData);
-    SerialBT.print(", parsedNumber: ");
-    SerialBT.println(errNum);
+    // SerialBT.print("Error: ");
+    // SerialBT.print(sData);
+    // SerialBT.print(", parsedNumber: ");
+    // SerialBT.println(errNum);
     processMachineError(errNum);
-    // clearGrblError();
+    clearGrblError();
   }
   if (!strncmp(data->alarm, "ALARM:", 6))
   {
     String sData = String(data->alarm);
     int alarmNum = sData.substring(6).toInt();
-    SerialBT.print("Alarm: ");
-    SerialBT.print(sData);
-    SerialBT.print(", parsedAlarm: ");
-    SerialBT.println(alarmNum);
+    // SerialBT.print("Alarm: ");
+    // SerialBT.print(sData);
+    // SerialBT.print(", parsedAlarm: ");
+    // SerialBT.println(alarmNum);
     processAlarm(alarmNum);
-    // clearGrblAlarm();
+    clearGrblAlarm();
   }
   if (!strncmp(data->message, "[MSG:", 5))
   {
@@ -234,11 +234,7 @@ void loop()
   }
   // delay(1);
   hubTick();
-  if (millis() - lastSendStatus >= 1000 || lastSendStatus == 0 || millis()-lastSendStatus < 0)
-  {
-    lastSendStatus = millis();
-    Serial.println("?");
-  }
+  machineTick();
 }
 
 void clearMessages()

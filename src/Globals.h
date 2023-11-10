@@ -3,6 +3,7 @@
 // #include "grbl/c_src/grbl_chat_c.h"
 
 extern BluetoothSerial SerialBT;
+extern bool isBtConnected;
 // extern grbl_data_t grbl_data;
 extern String ipAddress;
 

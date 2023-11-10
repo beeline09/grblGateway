@@ -1,4 +1,4 @@
 #include <Arduino.h>
 
-void getStatus();
-void checkForOk();
+void machineTick();
+int sendCommand(char *command);

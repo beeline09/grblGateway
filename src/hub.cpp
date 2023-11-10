@@ -4,8 +4,10 @@
 #include "bt.h"
 #include "Globals.h"
 #include "grbl/grbl_chat.h"
+#include "machine.h"
+#include <LittleFS.h>
 
-GyverPortal ui;
+GyverPortal ui(&LittleFS);
 
 String wName;
 String wSoftName;
@@ -20,7 +22,18 @@ uint16_t spindelRpmSliderMin;
 uint16_t spindelRpmSliderMax;
 uint16_t spindelRpmSliderCurrent;
 
+int alert = 0;
+
 GP_PGM(GP_TRANSP, "#00000000");
+
+void sendCommandToMachine(char *command)
+{
+    int c = sendCommand(command);
+    if (c > 0)
+    {
+        alert = c;
+    }
+}
 
 void buildMainApp()
 {
@@ -30,7 +43,7 @@ void buildMainApp()
     GP.UI_MENU("Cnc3018 Pro", GP_RED); // начать меню
 
     // список имён компонентов на обновление
-    GP.UPDATE("xAxis,yAxis,zAxis,wName,wPass,alert1,wSoftName,btName,spindelRPM,spindelRpmSlider,xAxisR,yAxisR,zAxisR,wMessage,wError,wAlarm,wSpMinRpm,wSpMaxRpm");
+    GP.UPDATE("xAxis,yAxis,zAxis,wName,wPass,alert1,wSoftName,btName,spindelRPM,spindelRpmSlider,xAxisR,yAxisR,zAxisR,wMessage,wError,wAlarm,wSpMinRpm,wSpMaxRpm,stepSizeXY,stepSizeZ,accelerationXY,accelerationZ");
 
     GP.PAGE_TITLE("CNC Portal");
 
@@ -41,16 +54,15 @@ void buildMainApp()
 
     // ссылки меню
     GP.UI_LINK("/", "Control");
-    GP.UI_LINK("/sd", "Print from SD");
+    // GP.UI_LINK("/sd", "Print from SD");
     GP.UI_LINK("/settings", "Settings");
     GP.UI_LINK("/info", "Info");
+    // GP.UI_LINK("/ota_update", "OTA update");
+
+    GP.OTA_FIRMWARE();
 
     // кастомный контент
     GP.HR(GP_GRAY);
-    GP.LABEL("Some label!");
-    GP.BREAK();
-    GP.LABEL(ui.getSystemTime().encode());
-    GP.BUTTON_MINI("btn", "Button");
 
     // начать основное окно
     GP.UI_BODY();
@@ -97,7 +109,7 @@ void buildMainApp()
     }
     else if (ui.uri("/settings"))
     {
-        GP.LABEL("Настройки");
+        GP.LABEL("Settings");
         M_GRID(
             M_BLOCK_TAB(
                 "Wi-Fi",
@@ -120,7 +132,7 @@ void buildMainApp()
                 "CNC params",
                 M_BOX(GP.LABEL("Spindel min RPM"); GP.NUMBER("wSpMinRpm", "", spindleMinRpm););
                 M_BOX(GP.LABEL("Spindel max RPM"); GP.NUMBER("wSpMaxRpm", "", spindleMaxRpm););
-                GP.PLAIN(/*"Если в течение нескольких попыток не получится подключиться к сети с этими параметрами, то будет запущена WiFi SoftAP"*/ "If within several attempts it is not possible to connect to the network with these parameters, WiFi SoftAP will be launched");
+                GP.PLAIN("Enter the $30 and $31 parameters from your GRBL.");
                 GP.BUTTON("saveCncParams", "Save");););
     }
     else if (ui.uri("/info"))
@@ -128,7 +140,7 @@ void buildMainApp()
         M_GRID(
             M_BLOCK_TAB(
                 "Information",
-                GP.SYSTEM_INFO("1.0.0-alpha"););); // + версия вашей программы (в таблице появится строка Version с указанным текстом), [строка]););
+                GP.SYSTEM_INFO("1.0.1-alpha"););); // + версия вашей программы (в таблице появится строка Version с указанным текстом), [строка]););
     }
     GP.JS_BEGIN();
     GP.SEND("setSliderWidth();");
@@ -137,50 +149,434 @@ void buildMainApp()
     GP.BUILD_END();
 }
 
+float parseStepSizeXYFromIndex(int index)
+{
+    float fNum = 10.0;
+    switch (index)
+    {
+    case 0:
+        fNum = 0.001;
+        break;
+    case 1:
+        fNum = 0.025;
+        break;
+    case 2:
+        fNum = 0.05;
+        break;
+    case 3:
+        fNum = 0.1;
+        break;
+    case 4:
+        fNum = 0.5;
+        break;
+    case 5:
+        fNum = 1.0;
+        break;
+    case 6:
+        fNum = 5.0;
+        break;
+    case 7:
+        fNum = 10.0;
+        break;
+    case 8:
+        fNum = 100.0;
+        break;
+    default:
+        break;
+    }
+    return fNum;
+}
+
+float parseStepSizeZFromIndex(int index)
+{
+    //"0.001,0.025,0.05,0.1,0.5,1,5,10"
+    float fNum = 10.0;
+    switch (index)
+    {
+    case 0:
+        fNum = 0.001;
+        break;
+    case 1:
+        fNum = 0.025;
+        break;
+    case 2:
+        fNum = 0.05;
+        break;
+    case 3:
+        fNum = 0.1;
+        break;
+    case 4:
+        fNum = 0.5;
+        break;
+    case 5:
+        fNum = 1.0;
+        break;
+    case 6:
+        fNum = 5.0;
+        break;
+    case 7:
+        fNum = 10.0;
+        break;
+    default:
+        break;
+    }
+    return fNum;
+}
+
+uint16_t parseAccelerationXYFromIndex(int index)
+{
+    //"1,5,10,25,50,100,250,500,1000,2500,5000,10000"
+    uint16_t iNum = 100;
+    switch (index)
+    {
+    case 0:
+        iNum = 1;
+        break;
+    case 1:
+        iNum = 5;
+        break;
+    case 2:
+        iNum = 10;
+        break;
+    case 3:
+        iNum = 25;
+        break;
+    case 4:
+        iNum = 50;
+        break;
+    case 5:
+        iNum = 100;
+        break;
+    case 6:
+        iNum = 250;
+        break;
+    case 7:
+        iNum = 500;
+        break;
+    case 8:
+        iNum = 1000;
+        break;
+    case 9:
+        iNum = 2500;
+        break;
+    case 10:
+        iNum = 5000;
+        break;
+    case 11:
+        iNum = 10000;
+        break;
+
+    default:
+        break;
+    }
+
+    return iNum;
+}
+
+uint16_t parseAccelerationZFromIndex(int index)
+{
+    //"1,5,10,25,50,100,250,500"
+    uint16_t iNum = 50;
+    switch (index)
+    {
+    case 0:
+        iNum = 1;
+        break;
+    case 1:
+        iNum = 5;
+        break;
+    case 2:
+        iNum = 10;
+        break;
+    case 3:
+        iNum = 25;
+        break;
+    case 4:
+        iNum = 50;
+        break;
+    case 5:
+        iNum = 100;
+        break;
+    case 6:
+        iNum = 250;
+        break;
+    case 7:
+        iNum = 500;
+        break;
+
+    default:
+        break;
+    }
+
+    return iNum;
+}
+
+void parseSpinners()
+{
+    if (ui.clickInt("stepSizeXY", stepSizeXYIndex))
+    {
+        //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
+        // Serial.printf("Selected step size XY index: %d", stepSizeXYIndex);
+        saveStepSizeXY(parseStepSizeXYFromIndex(stepSizeXYIndex));
+    }
+    else if (ui.clickInt("stepSizeZ", stepSizeZIndex))
+    {
+        //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
+        // Serial.printf("Selected step size Z index: %d", stepSizeZIndex);
+        saveStepSizeZ(parseStepSizeZFromIndex(stepSizeZIndex));
+    }
+    else if (ui.clickInt("accelerationXY", accXYIndex))
+    {
+        //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
+        // Serial.printf("Selected acceleration XY index: %d", accXYIndex);
+        saveAccelerationXY(parseAccelerationXYFromIndex(accXYIndex));
+    }
+    else if (ui.clickInt("accelerationZ", accZIndex))
+    {
+        //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
+        // Serial.printf("Selected acceleration Z index: %d", accZIndex);
+        saveAccelerationZ(parseAccelerationZFromIndex(accZIndex));
+    }
+}
+
+void parseLabels()
+{
+    if (ui.clickString("wName", wName))
+    {
+        // Serial.print("wName: ");
+        // Serial.println(wName);
+    }
+    else if (ui.clickString("wPass", wPass))
+    {
+        // Serial.print("wPass: ");
+        // Serial.println(wPass);
+    }
+    else if (ui.clickString("wSoftName", wSoftName))
+    {
+        // Serial.print("wSoftName: ");
+        // Serial.println(wSoftName);
+    }
+    else if (ui.clickString("btName", btName))
+    {
+        // Serial.print("btName: ");
+        // Serial.println(btName);
+    }
+    else if (ui.clickInt("wSpMinRpm", spindleMinRpm))
+    {
+        // char bigBuf[100] = "";
+        // sprintf_P(bigBuf, "wSpMinRpm: %d", spindleMinRpm);
+        // Serial.println(bigBuf);
+    }
+    else if (ui.clickInt("wSpMaxRpm", spindleMaxRpm))
+    {
+        // char bigBuf[100] = "";
+        // sprintf_P(bigBuf, "wSpMaxRpm: %d", spindleMaxRpm);
+        // Serial.println(bigBuf);
+    }
+}
+
+void parseSliders()
+{
+    if (ui.click("spindelRpmSlider"))
+    {
+        uint16_t rpm = (uint16_t)ui.getFloat("spindelRpmSlider");
+        saveSpindelCurrentRpm(rpm);
+        spindelRpmSliderCurrent = rpm;
+        // char bigBuf[100] = "";
+        // sprintf_P(bigBuf, "Selected spider rpm: %d", rpm);
+        // Serial.println(bigBuf);
+
+        if (spindelValue > 0.0 && rpm > 0 && ((uint16_t)spindelValue - rpm) != 0)
+        {
+            char bigBuf[25] = "";
+            sprintf_P(bigBuf, "M3 S%d", rpm);
+            sendCommandToMachine(bigBuf);
+            // Serial.println(bigBuf);
+        }
+    }
+}
+
+void parseButtons()
+{
+    if (ui.click("saveWifiParams"))
+    {
+        if (wName.length() <= 3)
+        {
+            alert = 1;
+        }
+        else
+        {
+            saveWiFiName(wName);
+            saveWiFiPassword(wPass);
+            delay(1000);
+            initWiFi();
+        }
+    }
+    // Сохраняем название встроенной ТД
+    else if (ui.click("saveWifiSoftAPParams"))
+    {
+        // Serial.println(wSoftName);
+        if (wSoftName.length() <= 3)
+        {
+            alert = 2;
+        }
+        else
+        {
+            saveWifiSoftApName(wSoftName);
+            delay(100);
+            initWiFi();
+        }
+    }
+    else if (ui.click("saveBtParams"))
+    {
+        if (btName.length() <= 3)
+        {
+            alert = 3;
+        }
+        else
+        {
+            // Serial.println("");
+            // Serial.print("btName: ");
+            // Serial.println(btName);
+
+            saveBtName(btName);
+            delay(100);
+            initBt();
+        }
+    }
+    else if (ui.click("move_HOME"))
+    {
+        clearMessages();
+        // Serial.println("$H");
+        sendCommandToMachine("$H");
+        // delay(50);
+        // Serial.println("?");
+    }
+    else if (ui.click("softReset"))
+    {
+        clearMessages();
+        if (!isBtConnected)
+        {
+            Serial.write(0x18);
+        }
+        delay(50);
+        // Serial.println("?");
+    }
+    else if (ui.click("resetZero"))
+    {
+        clearMessages();
+        // Serial.println("G10 P0 L20 X0 Y0 Z0");
+        sendCommandToMachine("G10 P0 L20 X0 Y0 Z0");
+        // delay(50);
+        // Serial.println("?");
+    }
+    else if (ui.click("unlock"))
+    {
+        clearMessages();
+        // Serial.println("$X");
+        sendCommandToMachine("$X");
+        // delay(50);
+        // Serial.println("?");
+    }
+    else if (ui.click("saveCncParams"))
+    {
+        if (spindleMinRpm < 0 || spindleMaxRpm < spindleMinRpm)
+        {
+            alert = 4;
+        }
+        else
+        {
+            saveSpindleMinRpm(spindleMinRpm);
+            saveSpindleMaxRpm(spindleMaxRpm);
+            delay(1000);
+            GP.RELOAD("saveCncParams");
+        }
+    }
+    else if (ui.click("spindelPower"))
+    {
+        char bigBuf[100] = "";
+        // sprintf_P(bigBuf, "Selected spindel rpm: %d", spindelRpmSliderCurrent);
+        // Serial.println(bigBuf);
+        if (spindelValue == 0.0 && spindelRpmSliderCurrent > 0)
+        {
+            char bigBuf[25] = "";
+            sprintf_P(bigBuf, "M3 S%d", spindelRpmSliderCurrent);
+            // Serial.println(bigBuf);
+            sendCommandToMachine(bigBuf);
+        }
+        else
+        {
+            // Serial.println("M5");
+            sendCommandToMachine("M5");
+        }
+    }
+    // Нажали на одну из кнопок перемещения
+    else if (ui.clickSub("move"))
+    {
+        //$J=G21G91X10F500
+        char buf[25] = "";
+        uint16_t accXY = parseAccelerationXYFromIndex(accXYIndex);
+        uint16_t accZ = parseAccelerationZFromIndex(accZIndex);
+        float ssXY = parseStepSizeXYFromIndex(stepSizeXYIndex);
+        float ssZ = parseStepSizeZFromIndex(stepSizeZIndex);
+        String direction = "";
+        String axis = "";
+        char stepSize[10] = "";
+        char acceleration[10] = "";
+        if (ui.click("moveY_UP"))
+        {
+            axis = "Y";
+            sprintf(stepSize, "%.02f", ssXY);
+            sprintf(acceleration, "%d", accXY);
+        }
+        else if (ui.click("moveY_DOWN"))
+        {
+            axis = "Y";
+            direction = "-";
+            sprintf(stepSize, "%.02f", ssXY);
+            sprintf(acceleration, "%d", accXY);
+        }
+        else if (ui.click("moveX_LEFT"))
+        {
+            axis = "X";
+            direction = "-";
+            sprintf(stepSize, "%.02f", ssXY);
+            sprintf(acceleration, "%d", accXY);
+        }
+        else if (ui.click("moveX_RIGHT"))
+        {
+            axis = "X";
+            sprintf(stepSize, "%.02f", ssXY);
+            sprintf(acceleration, "%d", accXY);
+        }
+        else if (ui.click("moveZ_UP"))
+        {
+            axis = "Z";
+            sprintf(stepSize, "%.02f", ssZ);
+            sprintf(acceleration, "%d", accZ);
+        }
+        else if (ui.click("moveZ_DOWN"))
+        {
+            axis = "Z";
+            direction = "-";
+            sprintf(stepSize, "%.02f", ssZ);
+            sprintf(acceleration, "%d", accZ);
+        }
+        sprintf(buf, "$J=G21G91%s%s%sF%s", axis, direction, stepSize, acceleration);
+        if (axis.length() > 0)
+        {
+            sendCommandToMachine(buf);
+        }
+    }
+}
+
 // билдер
 void build()
 {
     buildMainApp();
-    Serial.println("Запускаем портал");
+    // Serial.println("Запускаем портал");
 }
 
-void actionLabels()
-{
-    if (ui.clickString("wName", wName))
-    {
-        Serial.print("wName: ");
-        Serial.println(wName);
-    }
-    else if (ui.clickString("wPass", wPass))
-    {
-        Serial.print("wPass: ");
-        Serial.println(wPass);
-    }
-    else if (ui.clickString("wSoftName", wSoftName))
-    {
-        Serial.print("wSoftName: ");
-        Serial.println(wSoftName);
-    }
-    else if (ui.clickString("btName", btName))
-    {
-        Serial.print("btName: ");
-        Serial.println(btName);
-    }
-    else if (ui.clickInt("wSpMinRpm", spindleMinRpm))
-    {
-        char bigBuf[100] = "";
-        sprintf_P(bigBuf, "wSpMinRpm: %d", spindleMinRpm);
-        Serial.println(bigBuf);
-    }
-    else if (ui.clickInt("wSpMaxRpm", spindleMaxRpm))
-    {
-        char bigBuf[100] = "";
-        sprintf_P(bigBuf, "wSpMaxRpm: %d", spindleMaxRpm);
-        Serial.println(bigBuf);
-    }
-}
-
-int alert = 0;
 void action()
 {
     // было обновление
@@ -194,10 +590,17 @@ void action()
         ui.updateString("yAxisR", WposYR);
         ui.updateString("zAxis", WposZ);
         ui.updateString("zAxisR", WposZR);
-        ui.updateFloat("spindelRPM", spindelValue, 0);
+        char spRpm[25] = "";
+        sprintf(spRpm, "%d RPM", (uint16_t)spindelValue);
+        String s = spRpm;
+        ui.updateString("spindelRPM", s);
         ui.updateString("wMessage", wMessage);
         ui.updateString("wError", wError);
         ui.updateString("wAlarm", wAlarm);
+        ui.updateInt("stepSizeXY", stepSizeXYIndex);
+        ui.updateInt("stepSizeZ", stepSizeZIndex);
+        ui.updateInt("accelerationXY", accXYIndex);
+        ui.updateInt("accelerationZ", accZIndex);
         //   ui.updateString("pass", valPass);
         //    ui.updateString("pass", valPass);
         if (ui.update("alert1"))
@@ -222,136 +625,19 @@ void action()
                 alert = 0;
                 ui.answer(String("The minimum spindle speed must be greater than or equal to zero. The maximum speed must be greater than the minimum!"));
             }
+            else if (alert == 5)
+            {
+                alert = 0;
+                ui.answer(String("To manually control the machine, you must disconnect from Bluetooth to avoid problems!"));
+            }
         }
     }
     if (ui.click())
     {
-        actionLabels();
-        if (ui.click("btn"))
-        {
-            WposX = "Haha";
-        }
-        // Сохраняем параметры подключения к существующей WiFi сети
-        else if (ui.click("saveWifiParams"))
-        {
-            if (wName.length() <= 3)
-            {
-                alert = 1;
-            }
-            else
-            {
-                saveWiFiName(wName);
-                saveWiFiPassword(wPass);
-                delay(1000);
-                initWiFi();
-            }
-        }
-        // Сохраняем название встроенной ТД
-        else if (ui.click("saveWifiSoftAPParams"))
-        {
-            Serial.println(wSoftName);
-            if (wSoftName.length() <= 3)
-            {
-                alert = 2;
-            }
-            else
-            {
-                saveWifiSoftApName(wSoftName);
-                delay(100);
-                initWiFi();
-            }
-        }
-        else if (ui.click("saveBtParams"))
-        {
-            if (btName.length() <= 3)
-            {
-                alert = 3;
-            }
-            else
-            {
-                Serial.println("");
-                Serial.print("btName: ");
-                Serial.println(btName);
-
-                saveBtName(btName);
-                delay(100);
-                initBt();
-            }
-        }
-        else if (ui.click("move_HOME"))
-        {
-            clearMessages();
-            Serial.println("$H");
-            delay(50);
-            // Serial.println("?");
-        }
-        else if (ui.click("softReset"))
-        {
-            clearMessages();
-            Serial.write(0x18);
-            delay(50);
-            Serial.println("?");
-        }
-        else if (ui.click("resetZero"))
-        {
-            clearMessages();
-            Serial.println("G10 P0 L20 X0 Y0 Z0");
-            delay(50);
-            // Serial.println("?");
-        }
-        else if (ui.click("unlock"))
-        {
-            clearMessages();
-            Serial.println("$X");
-            delay(50);
-            // Serial.println("?");
-        }
-        else if (ui.click("saveCncParams"))
-        {
-            if (spindleMinRpm < 0 || spindleMaxRpm < spindleMinRpm)
-            {
-                alert = 4;
-            }
-            else
-            {
-                saveSpindleMinRpm(spindleMinRpm);
-                saveSpindleMaxRpm(spindleMaxRpm);
-                delay(1000);
-                GP.RELOAD("saveCncParams");
-            }
-        }
-        else if (ui.click("spindelRpmSlider"))
-        {
-            uint16_t rpm = (uint16_t)ui.getFloat("spindelRpmSlider");
-            saveSpindelCurrentRpm(rpm);
-            spindelRpmSliderCurrent = rpm;
-            char bigBuf[100] = "";
-            sprintf_P(bigBuf, "Selected spider rpm: %d", rpm);
-            Serial.println(bigBuf);
-
-            if (spindelValue > 0.0 && rpm > 0 && ((uint16_t)spindelValue - rpm) != 0)
-            {
-                char bigBuf[25] = "";
-                sprintf_P(bigBuf, "M3 S%d", rpm);
-                Serial.println(bigBuf);
-            }
-        }
-        else if (ui.click("spindelPower"))
-        {
-            char bigBuf[100] = "";
-            sprintf_P(bigBuf, "Selected spindel rpm: %d", spindelRpmSliderCurrent);
-            Serial.println(bigBuf);
-            if (spindelValue == 0.0 && spindelRpmSliderCurrent > 0)
-            {
-                char bigBuf[25] = "";
-                sprintf_P(bigBuf, "M3 S%d", spindelRpmSliderCurrent);
-                Serial.println(bigBuf);
-            }
-            else
-            {
-                Serial.println("M5");
-            }
-        }
+        parseLabels();
+        parseSpinners();
+        parseButtons();
+        parseSliders();
     }
 }
 
@@ -370,9 +656,12 @@ void initHub()
 
     stepSizeXYIndex = 7;
     stepSizeZIndex = 5;
+    accXYIndex = 5;
+    accZIndex = 4;
 
     //"1,5,10,25,50,100,250,500,1000,2500,5000,10000"
-    switch (getAccelerationXY())
+    uint16_t acXY = getAccelerationXY();
+    switch (acXY)
     {
     case 1:
         accXYIndex = 0;
@@ -415,9 +704,11 @@ void initHub()
         accXYIndex = 5;
         break;
     }
+    // Serial.printf("Init with acc XY: %d and set index: %d\n", acXY, accXYIndex);
 
     //"1,5,10,25,50,100,250,500"
-    switch (getAccelerationZ())
+    uint16_t acZ = getAccelerationZ();
+    switch (acZ)
     {
     case 1:
         accZIndex = 0;
@@ -448,79 +739,83 @@ void initHub()
         accZIndex = 4;
         break;
     }
+    // Serial.printf("Init with acc Z: %d and set index: %d\n", acZ, accZIndex);
 
     //"0.001,0.025,0.05,0.1,0.5,1,5,10,100"
     float szXY = getStepSizeXY();
-    if (szXY == 0.001)
+    if (szXY == 0.001F)
     {
         stepSizeXYIndex = 0;
     }
-    else if (szXY == 0.025)
+    else if (szXY == 0.025F)
     {
         stepSizeXYIndex = 1;
     }
-    else if (szXY == 0.05)
+    else if (szXY == 0.05F)
     {
         stepSizeXYIndex = 2;
     }
-    else if (szXY == 0.1)
+    else if (szXY == 0.1F)
     {
         stepSizeXYIndex = 3;
     }
-    else if (szXY == 0.5)
+    else if (szXY == 0.5F)
     {
         stepSizeXYIndex = 4;
     }
-    else if (szXY == 1.0)
+    else if (szXY == 1.0F)
     {
         stepSizeXYIndex = 5;
     }
-    else if (szXY == 5.0)
+    else if (szXY == 5.0F)
     {
         stepSizeXYIndex = 6;
     }
-    else if (szXY == 10.0)
+    else if (szXY == 10.0F)
     {
         stepSizeXYIndex = 7;
     }
-    else if (szXY == 100.0)
+    else if (szXY == 100.0F)
     {
         stepSizeXYIndex = 8;
     }
+    // Serial.printf("Init with step size XY: %f and set index: %d\n", szXY, stepSizeXYIndex);
+
     //"0.001,0.025,0.05,0.1,0.5,1,5,10"
     float szZ = getStepSizeZ();
-    if (szZ == 0.001)
+    if (szZ == 0.001F)
     {
         stepSizeZIndex = 0;
     }
-    else if (szZ == 0.025)
+    else if (szZ == 0.025F)
     {
         stepSizeZIndex = 1;
     }
-    else if (szZ == 0.05)
+    else if (szZ == 0.05F)
     {
         stepSizeZIndex = 2;
     }
-    else if (szZ == 0.1)
+    else if (szZ == 0.1F)
     {
         stepSizeZIndex = 3;
     }
-    else if (szZ == 0.5)
+    else if (szZ == 0.5F)
     {
         stepSizeZIndex = 4;
     }
-    else if (szZ == 1.0)
+    else if (szZ == 1.0F)
     {
         stepSizeZIndex = 5;
     }
-    else if (szZ == 5.0)
+    else if (szZ == 5.0F)
     {
         stepSizeZIndex = 6;
     }
-    else if (szZ == 10.0)
+    else if (szZ == 10.0F)
     {
         stepSizeZIndex = 7;
     }
+    // Serial.printf("Init with step size Z: %f and set index: %d\n", szZ, stepSizeZIndex);
 
     // подключаем конструктор и запускаем
     ui.attachBuild(build);
@@ -532,6 +827,11 @@ void initHub()
     else
     {
         ui.start();
+    }
+    ui.enableOTA(); // без пароля
+    if (LittleFS.begin())
+    {
+        ui.downloadAuto(true);
     }
 }
 
