@@ -30,6 +30,6 @@
 
 В дальнейшем можно будет обновлять прошивку, нажав на кнопку **OTA Update** в боковом меню.
 
-Большое спасибо [Alex Guyver](https://github.com/GyverLibs) за его прекрасную библиотеку [GyverPortal](https://github.com/GyverLibs/GyverPortal). Без нее у меня ничего не получилось бы!
+Большое спасибо [Alex Gyver](https://github.com/GyverLibs) за его прекрасную библиотеку [GyverPortal](https://github.com/GyverLibs/GyverPortal). Без нее у меня ничего не получилось бы!
 
 Работа еще в процессе! Вносите предложения по улучшению.
