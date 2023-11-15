@@ -11,6 +11,8 @@ void setup()
   Serial.begin(115200);
   initBt();
   initWiFi();
+  Serial.write(0x18);
+  delay(100);
   Serial.println("$$");
 }
 
@@ -230,7 +232,7 @@ void loop()
   if (!strncmp(data->message, "[MSG:", 5))
   {
     wMessage = String(data->message).substring(5);
-    // clearGrblMessage();
+    clearGrblMessage();
   }
   // delay(1);
   hubTick();

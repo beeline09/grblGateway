@@ -5,9 +5,9 @@
 #include "Globals.h"
 #include "grbl/grbl_chat.h"
 #include "machine.h"
-#include <LittleFS.h>
+#include <SPIFFS.h>
 
-GyverPortal ui(&LittleFS);
+GyverPortal ui(&SPIFFS);
 
 String wName;
 String wSoftName;
@@ -38,6 +38,7 @@ void sendCommandToMachine(char *command)
 void buildMainApp()
 {
     GP.BUILD_BEGIN(GP_DARK);
+    GP.ICON_SUPPORT();
     GP.ALERT("alert1");
 
     GP.UI_MENU("Cnc3018 Pro", GP_RED); // начать меню
@@ -58,6 +59,7 @@ void buildMainApp()
     GP.UI_LINK("/settings", "Settings");
     GP.UI_LINK("/info", "Info");
     // GP.UI_LINK("/ota_update", "OTA update");
+    // GP.FILE_MANAGER(&SPIFFS);
 
     GP.OTA_FIRMWARE();
 
@@ -87,23 +89,23 @@ void buildMainApp()
                 M_BOX(GP.LABEL("Error "); GP.LABEL("", "wError"););
                 M_BOX(GP.LABEL("Alarm "); GP.LABEL("", "wAlarm"););
                 GP.LABEL("\u3164");
-                M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveY_UP", "Y+"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveZ_UP", "Z+"););
-                M_BOX(GP.BUTTON("moveX_LEFT", "X-"); GP.BUTTON("spindelPower", "💥 Spindel"); GP.BUTTON("moveX_RIGHT", "X+"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true););
-                M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveY_DOWN", "Y-"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveZ_DOWN", "Z-"););
+                M_BOX(GP.BUTTON("moveY_UP_X_LEFT", "🢄"); GP.BUTTON("moveY_UP", "🢁"); GP.BUTTON("moveY_UP_X_RIGHT", "🢅"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveZ_UP", "Z🡩"););
+                M_BOX(GP.BUTTON("moveX_LEFT", "🢀"); GP.BUTTON("move_HOME", GP.ICON_FILE("/icons/home.svg", 20, GP_WHITE)); GP.BUTTON("moveX_RIGHT", "🢂"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("spindelPower", GP.ICON_FILE("/icons/spindel.svg", 20, GP_WHITE)););
+                M_BOX(GP.BUTTON("moveY_DOWN_X_LEFT", "🢇"); GP.BUTTON("moveY_DOWN", "🢃"); GP.BUTTON("moveY_DOWN_X_RIGHT", "🢆"); GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true); GP.BUTTON("moveZ_DOWN", "Z🡫"););
                 M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true););
-                M_BOX(GP.BUTTON("softReset", "↻ Soft Reset"); GP.BUTTON("resetZero", "⓿ Reset Zero"););
-                M_BOX(GP.BUTTON("unlock", "🔓 Unlock"); GP.BUTTON("move_HOME", "⌂ Home"););
+                M_BOX(
+                    GP.LABEL("Spindel RPM");
+                    GP.SLIDER("spindelRpmSlider", spindelRpmSliderCurrent, spindelRpmSliderMin, spindelRpmSliderMax, 10.0););
+                M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true););
+                M_BOX(GP.BUTTON("softReset", "↻ Soft Reset"); GP.BUTTON("resetZero", "⓿ Reset Zero"); GP.BUTTON("unlock", "🔓 Unlock"););
                 M_BOX(GP.BUTTON("moveSpacer", "", "", GP_TRANSP, "", true););
                 M_BOX(GP.TITLE("\u3164"); GP.TITLE("X,Y"); GP.TITLE("Z\u3164\u3164\u3164\u3164"););
                 M_BOX(
-                    GP.LABEL("\u3164\u3164Step size"); GP.SELECT("stepSizeXY", "0.001,0.025,0.05,0.1,0.5,1,5,10,100", stepSizeXYIndex); GP.SELECT("stepSizeZ", "0.001,0.025,0.05,0.1,0.5,1,5,10", stepSizeZIndex););
+                    GP.LABEL("Step size  \u3164"); GP.SELECT("stepSizeXY", "0.001,0.025,0.05,0.1,0.5,1,5,10,100,200", stepSizeXYIndex); GP.SELECT("stepSizeZ", "0.001,0.025,0.05,0.1,0.5,1,5,10,25,50", stepSizeZIndex););
                 M_BOX(
                     GP.LABEL("Acceleration ");
-                    GP.SELECT("accelerationXY", "1,5,10,25,50,100,250,500,1000,2500,5000,10000", accXYIndex); GP.SELECT("accelerationZ", "1,5,10,25,50,100,250,500", accZIndex););
+                    GP.SELECT("accelerationXY", "1,5,10,25,50,100,250,500,1000,2500,5000,10000", accXYIndex); GP.SELECT("accelerationZ", "1,5,10,25,50,100,250,500,1000", accZIndex););
                 GP.LABEL("\u3164");
-                M_BOX(
-                    GP.LABEL("Spindel RPM ");
-                    GP.SLIDER("spindelRpmSlider", spindelRpmSliderCurrent, spindelRpmSliderMin, spindelRpmSliderMax, 10.0););
 
             ););
     }
@@ -140,7 +142,7 @@ void buildMainApp()
         M_GRID(
             M_BLOCK_TAB(
                 "Information",
-                GP.SYSTEM_INFO("1.0.1-alpha"););); // + версия вашей программы (в таблице появится строка Version с указанным текстом), [строка]););
+                GP.SYSTEM_INFO("1.0.2-beta"););); // + версия вашей программы (в таблице появится строка Version с указанным текстом), [строка]););
     }
     GP.JS_BEGIN();
     GP.SEND("setSliderWidth();");
@@ -181,6 +183,9 @@ float parseStepSizeXYFromIndex(int index)
     case 8:
         fNum = 100.0;
         break;
+    case 9:
+        fNum = 200.0;
+        break;
     default:
         break;
     }
@@ -216,6 +221,12 @@ float parseStepSizeZFromIndex(int index)
         break;
     case 7:
         fNum = 10.0;
+        break;
+    case 8:
+        fNum = 25.0;
+        break;
+    case 9:
+        fNum = 50.0;
         break;
     default:
         break;
@@ -302,6 +313,9 @@ uint16_t parseAccelerationZFromIndex(int index)
         break;
     case 7:
         iNum = 500;
+        break;
+    case 8:
+        iNum = 1000;
         break;
 
     default:
@@ -444,14 +458,6 @@ void parseButtons()
             initBt();
         }
     }
-    else if (ui.click("move_HOME"))
-    {
-        clearMessages();
-        // Serial.println("$H");
-        sendCommandToMachine("$H");
-        // delay(50);
-        // Serial.println("?");
-    }
     else if (ui.click("softReset"))
     {
         clearMessages();
@@ -513,59 +519,66 @@ void parseButtons()
     // Нажали на одну из кнопок перемещения
     else if (ui.clickSub("move"))
     {
+        char jog[30] = "";
+        if (ui.click("move_HOME"))
+        {
+            clearMessages();
+            // Serial.println("$H");
+            sendCommandToMachine("$H");
+            // delay(50);
+            // Serial.println("?");
+        }
         //$J=G21G91X10F500
-        char buf[25] = "";
-        uint16_t accXY = parseAccelerationXYFromIndex(accXYIndex);
-        uint16_t accZ = parseAccelerationZFromIndex(accZIndex);
-        float ssXY = parseStepSizeXYFromIndex(stepSizeXYIndex);
         float ssZ = parseStepSizeZFromIndex(stepSizeZIndex);
-        String direction = "";
-        String axis = "";
-        char stepSize[10] = "";
-        char acceleration[10] = "";
-        if (ui.click("moveY_UP"))
+        uint16_t accZ = parseAccelerationZFromIndex(accZIndex);
+        if (ui.click("moveZ_UP"))
         {
-            axis = "Y";
-            sprintf(stepSize, "%.02f", ssXY);
-            sprintf(acceleration, "%d", accXY);
-        }
-        else if (ui.click("moveY_DOWN"))
-        {
-            axis = "Y";
-            direction = "-";
-            sprintf(stepSize, "%.02f", ssXY);
-            sprintf(acceleration, "%d", accXY);
-        }
-        else if (ui.click("moveX_LEFT"))
-        {
-            axis = "X";
-            direction = "-";
-            sprintf(stepSize, "%.02f", ssXY);
-            sprintf(acceleration, "%d", accXY);
-        }
-        else if (ui.click("moveX_RIGHT"))
-        {
-            axis = "X";
-            sprintf(stepSize, "%.02f", ssXY);
-            sprintf(acceleration, "%d", accXY);
-        }
-        else if (ui.click("moveZ_UP"))
-        {
-            axis = "Z";
-            sprintf(stepSize, "%.02f", ssZ);
-            sprintf(acceleration, "%d", accZ);
+            sprintf(jog, "$J=G21G91Z%.02fF%d", ssZ, accZ);
         }
         else if (ui.click("moveZ_DOWN"))
         {
-            axis = "Z";
-            direction = "-";
-            sprintf(stepSize, "%.02f", ssZ);
-            sprintf(acceleration, "%d", accZ);
+            sprintf(jog, "$J=G21G91Z-%.02fF%d", ssZ, accZ);
         }
-        sprintf(buf, "$J=G21G91%s%s%sF%s", axis, direction, stepSize, acceleration);
-        if (axis.length() > 0)
+        else
         {
-            sendCommandToMachine(buf);
+            uint16_t accXY = parseAccelerationXYFromIndex(accXYIndex);
+            float ssXY = parseStepSizeXYFromIndex(stepSizeXYIndex);
+            if (ui.click("moveY_UP"))
+            {
+                sprintf(jog, "$J=G21G91Y%.02fF%d", ssXY, accXY);
+            }
+            else if (ui.click("moveY_DOWN"))
+            {
+                sprintf(jog, "$J=G21G91Y-%.02fF%d", ssXY, accXY);
+            }
+            else if (ui.click("moveX_LEFT"))
+            {
+                sprintf(jog, "$J=G21G91X-%.02fF%d", ssXY, accXY);
+            }
+            else if (ui.click("moveX_RIGHT"))
+            {
+                sprintf(jog, "$J=G21G91X%.02fF%d", ssXY, accXY);
+            }
+            else if (ui.click("moveY_UP_X_LEFT"))
+            {
+                sprintf(jog, "$J=G21G91X-%.02fY%.02fF%d", ssXY, ssXY, accXY);
+            }
+            else if (ui.click("moveY_UP_X_RIGHT"))
+            {
+                sprintf(jog, "$J=G21G91X%.02fY%.02fF%d", ssXY, ssXY, accXY);
+            }
+            else if (ui.click("moveY_DOWN_X_LEFT"))
+            {
+                sprintf(jog, "$J=G21G91X-%.02fY-%.02fF%d", ssXY, ssXY, accXY);
+            }
+            else if (ui.click("moveY_DOWN_X_RIGHT"))
+            {
+                sprintf(jog, "$J=G21G91X%.02fY-%.02fF%d", ssXY, ssXY, accXY);
+            }
+        }
+        if (strlen(jog))
+        {
+            sendCommandToMachine(jog);
         }
     }
 }
@@ -734,6 +747,9 @@ void initHub()
     case 500:
         accZIndex = 7;
         break;
+    case 1000:
+        accZIndex = 8;
+        break;
 
     default:
         accZIndex = 4;
@@ -779,6 +795,10 @@ void initHub()
     {
         stepSizeXYIndex = 8;
     }
+    else if (szXY == 200.0F)
+    {
+        stepSizeXYIndex = 9;
+    }
     // Serial.printf("Init with step size XY: %f and set index: %d\n", szXY, stepSizeXYIndex);
 
     //"0.001,0.025,0.05,0.1,0.5,1,5,10"
@@ -815,6 +835,14 @@ void initHub()
     {
         stepSizeZIndex = 7;
     }
+    else if (szZ == 25.0F)
+    {
+        stepSizeZIndex = 8;
+    }
+    else if (szZ == 50.0F)
+    {
+        stepSizeZIndex = 9;
+    }
     // Serial.printf("Init with step size Z: %f and set index: %d\n", szZ, stepSizeZIndex);
 
     // подключаем конструктор и запускаем
@@ -829,7 +857,7 @@ void initHub()
         ui.start();
     }
     ui.enableOTA(); // без пароля
-    if (LittleFS.begin())
+    if (SPIFFS.begin())
     {
         ui.downloadAuto(true);
     }

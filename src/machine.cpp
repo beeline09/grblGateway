@@ -31,7 +31,7 @@ byte timeDelay = 150, optionSelectLast;
 void machineTick()
 {
   static unsigned long lastSendStatus = 0;
-  if (millis() - lastSendStatus >= 500 || lastSendStatus == 0 || millis() - lastSendStatus < 0)
+  if (millis() - lastSendStatus >= 1000 || lastSendStatus == 0 || millis() - lastSendStatus < 0)
   {
     lastSendStatus = millis();
     if (!isBtConnected)
